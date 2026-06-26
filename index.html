@@ -922,7 +922,7 @@ let generatedImages = {};
 let apiKey = '';
 
 async function generateImage(prompt, retries = 2) {
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-exp:generateContent?key=${apiKey}`;
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-image:generateContent?key=${apiKey}`;
   for (let attempt = 0; attempt <= retries; attempt++) {
     try {
       const resp = await fetch(url, {
@@ -930,7 +930,7 @@ async function generateImage(prompt, retries = 2) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           contents: [{ parts: [{ text: prompt }], role: 'user' }],
-          generationConfig: { responseModalities: ['IMAGE'] }
+          generationConfig: { responseModalities: ['TEXT', 'IMAGE'] }
         })
       });
       if (!resp.ok) {
@@ -983,8 +983,33 @@ async function startImageGeneration() {
   initGame();
 }
 
-function skipGeneration() {
+async function skipGeneration() {
   document.getElementById('setup-screen').classList.add('hidden');
+  const loadScreen = document.getElementById('loading-screen');
+  loadScreen.classList.add('active');
+  const fill = document.getElementById('loading-fill');
+  const loadText = document.getElementById('loading-text');
+  loadText.textContent = 'Loading pre-generated artwork...';
+
+  let loaded = 0;
+  for (let i = 0; i < IMAGE_KEYS.length; i++) {
+    const key = IMAGE_KEYS[i];
+    fill.style.width = Math.round((i / IMAGE_KEYS.length) * 100) + '%';
+    try {
+      const resp = await fetch('images/' + key + '.png');
+      if (resp.ok) {
+        const blob = await resp.blob();
+        generatedImages[key] = URL.createObjectURL(blob);
+        loaded++;
+      }
+    } catch(e) {}
+  }
+
+  fill.style.width = '100%';
+  if (loaded > 0) loadText.textContent = `Loaded ${loaded} artworks!`;
+  else loadText.textContent = 'Using fallback art.';
+  await new Promise(r => setTimeout(r, 400));
+  loadScreen.classList.remove('active');
   initGame();
 }
 
