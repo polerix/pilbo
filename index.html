@@ -655,16 +655,18 @@ body {
 </head>
 <body>
 
-<!-- SETUP SCREEN (API Key) -->
+<!-- SETUP SCREEN -->
 <div id="setup-screen">
   <h1>Pilbo</h1>
   <p class="subtitle">The Alchemical Misadventures of a Homunculus</p>
+  <!-- Gemini API generation commented out for now
   <label for="api-key-input">Gemini API Key</label>
   <input type="password" id="api-key-input" placeholder="AIza..." autocomplete="off">
   <p class="note">Enter your Google Gemini API key to generate unique game artwork via AI. Get a free key at ai.google.dev</p>
   <button class="btn" id="generate-btn" onclick="startImageGeneration()">Generate Artwork</button>
   <div id="generate-status"></div>
-  <button class="btn" id="skip-btn" onclick="skipGeneration()">Skip &mdash; Use Fallback Art</button>
+  -->
+  <button class="btn" id="skip-btn" onclick="skipGeneration()">Play!</button>
 </div>
 
 <!-- LOADING SCREEN -->
@@ -919,6 +921,7 @@ const IMAGE_PROMPTS = {
 
 const IMAGE_KEYS = Object.keys(IMAGE_PROMPTS);
 let generatedImages = {};
+/* Gemini API generation commented out for now
 let apiKey = '';
 
 async function generateImage(prompt, retries = 2) {
@@ -982,6 +985,7 @@ async function startImageGeneration() {
   loadScreen.classList.remove('active');
   initGame();
 }
+*/
 
 async function skipGeneration() {
   document.getElementById('setup-screen').classList.add('hidden');
