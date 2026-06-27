@@ -1,0 +1,1866 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>Pilbo - The Homunculus</title>
+<link href="https://fonts.googleapis.com/css2?family=UnifrakturMaguntia&family=MedievalSharp&display=swap" rel="stylesheet">
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --parchment: #2a1a0a;
+  --parchment-light: #3d2a15;
+  --gold: #c9a84c;
+  --gold-bright: #ffd700;
+  --blood: #8b0000;
+  --ink: #1a0a00;
+  --bone: #d4c5a9;
+}
+
+body {
+  background: #0a0500;
+  overflow: hidden;
+  font-family: 'MedievalSharp', cursive;
+  color: var(--bone);
+  height: 100vh;
+  width: 100vw;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* ── SETUP SCREEN ── */
+#setup-screen {
+  position: fixed; inset: 0;
+  background: var(--ink);
+  z-index: 1000;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 2rem;
+}
+#setup-screen.hidden { display: none; }
+#setup-screen h1 {
+  font-family: 'UnifrakturMaguntia', cursive;
+  font-size: 3rem;
+  color: var(--gold);
+  text-shadow: 0 0 20px rgba(201,168,76,0.5);
+  margin-bottom: 0.5rem;
+}
+#setup-screen .subtitle {
+  color: var(--bone);
+  opacity: 0.7;
+  margin-bottom: 2rem;
+  text-align: center;
+}
+#setup-screen label {
+  color: var(--gold);
+  font-size: 1.1rem;
+  margin-bottom: 0.5rem;
+}
+#api-key-input {
+  width: min(400px, 80vw);
+  padding: 12px 16px;
+  background: var(--parchment);
+  border: 2px solid var(--gold);
+  border-radius: 8px;
+  color: var(--bone);
+  font-family: monospace;
+  font-size: 1rem;
+  margin-bottom: 1rem;
+}
+#setup-screen .note {
+  color: var(--bone);
+  opacity: 0.5;
+  font-size: 0.85rem;
+  margin-bottom: 1.5rem;
+  text-align: center;
+  max-width: 400px;
+}
+.btn {
+  padding: 12px 32px;
+  background: linear-gradient(135deg, var(--gold), #a07830);
+  border: 2px solid var(--gold-bright);
+  border-radius: 8px;
+  color: var(--ink);
+  font-family: 'MedievalSharp', cursive;
+  font-size: 1.2rem;
+  cursor: pointer;
+  transition: all 0.2s;
+  text-shadow: none;
+}
+.btn:hover { transform: scale(1.05); box-shadow: 0 0 20px rgba(201,168,76,0.4); }
+.btn:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
+#generate-status {
+  margin-top: 1rem;
+  color: var(--gold);
+  min-height: 2em;
+  text-align: center;
+}
+#skip-btn {
+  margin-top: 1rem;
+  background: transparent;
+  border-color: var(--gold);
+  color: var(--gold);
+  font-size: 0.95rem;
+  opacity: 0.7;
+}
+
+/* ── LOADING SCREEN ── */
+#loading-screen {
+  position: fixed; inset: 0;
+  background: var(--ink);
+  z-index: 999;
+  display: none;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+}
+#loading-screen.active { display: flex; }
+#loading-screen h2 {
+  font-family: 'UnifrakturMaguntia', cursive;
+  color: var(--gold);
+  font-size: 2rem;
+  margin-bottom: 1rem;
+}
+.loading-bar {
+  width: min(300px, 70vw);
+  height: 20px;
+  background: var(--parchment);
+  border: 2px solid var(--gold);
+  border-radius: 10px;
+  overflow: hidden;
+}
+.loading-fill {
+  height: 100%;
+  background: linear-gradient(90deg, var(--gold), var(--gold-bright));
+  width: 0%;
+  transition: width 0.3s;
+}
+#loading-text {
+  margin-top: 1rem;
+  color: var(--bone);
+  opacity: 0.7;
+}
+
+/* ── GAME CONTAINER ── */
+#game-container {
+  width: min(100vw, 480px);
+  height: min(100vh, 860px);
+  position: relative;
+  overflow: hidden;
+  background: var(--parchment);
+  border: 3px solid var(--gold);
+  border-radius: 4px;
+  display: flex;
+  flex-direction: column;
+}
+#game-container.hidden { display: none; }
+
+/* ── EFFECT OVERLAYS ── */
+#game-container.pixel-sort { animation: pixelGlitch 0.15s steps(1) infinite; }
+#game-container.rgb-cycle { animation: rgbCycle 0.4s linear infinite; }
+#game-container.color-filter { filter: hue-rotate(var(--hue-shift, 90deg)) saturate(1.5); }
+
+@keyframes pixelGlitch {
+  0%   { filter: none; }
+  20%  { filter: contrast(2) saturate(3) hue-rotate(90deg); }
+  40%  { filter: invert(1) contrast(1.5); }
+  60%  { filter: saturate(5) hue-rotate(200deg); }
+  80%  { filter: contrast(3) brightness(1.5); }
+  100% { filter: none; }
+}
+@keyframes rgbCycle {
+  0%   { filter: hue-rotate(0deg); }
+  100% { filter: hue-rotate(360deg); }
+}
+
+/* ── HUD ── */
+#hud {
+  height: 52px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 16px;
+  background: linear-gradient(180deg, rgba(0,0,0,0.7), transparent);
+  z-index: 10;
+  flex-shrink: 0;
+}
+#score-display {
+  font-family: 'UnifrakturMaguntia', cursive;
+  font-size: 1.5rem;
+  color: var(--gold);
+  text-shadow: 0 0 10px rgba(201,168,76,0.5);
+  min-width: 80px;
+}
+#level-display {
+  font-family: 'UnifrakturMaguntia', cursive;
+  font-size: 1.2rem;
+  color: var(--gold);
+  text-shadow: 0 0 10px rgba(201,168,76,0.5);
+}
+#combo-display {
+  font-family: 'MedievalSharp', cursive;
+  font-size: 0.85rem;
+  color: var(--bone);
+  opacity: 0.6;
+}
+
+/* ── DISEASE TOAST ── */
+#disease-toast {
+  position: absolute;
+  top: 40%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  font-family: 'UnifrakturMaguntia', cursive;
+  font-size: 1.5rem;
+  color: var(--gold-bright);
+  text-shadow: 0 0 20px rgba(255,215,0,0.8), 0 0 40px rgba(255,215,0,0.4);
+  pointer-events: none;
+  z-index: 50;
+  opacity: 0;
+  text-align: center;
+  line-height: 1.4;
+  max-width: 90%;
+}
+#disease-toast.show {
+  animation: toastFloat 3.5s ease-out forwards;
+}
+@keyframes toastFloat {
+  0%   { opacity: 0; transform: translate(-50%, -50%) scale(0.3); }
+  10%  { opacity: 1; transform: translate(-50%, -55%) scale(1.3); }
+  25%  { transform: translate(-50%, -60%) scale(1); }
+  75%  { opacity: 1; }
+  100% { opacity: 0; transform: translate(-50%, -100%) scale(0.7); }
+}
+
+/* ── EFFECT LABEL (center flash) ── */
+#effect-label {
+  position: absolute;
+  top: 30%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  font-family: 'MedievalSharp', cursive;
+  font-size: 1.3rem;
+  color: #ff6644;
+  text-shadow: 0 0 15px rgba(255,100,50,0.6);
+  pointer-events: none;
+  z-index: 45;
+  opacity: 0;
+  text-align: center;
+  white-space: nowrap;
+}
+#effect-label.show {
+  animation: effectFlash 2s ease-out forwards;
+}
+@keyframes effectFlash {
+  0%   { opacity: 0; transform: translate(-50%, -50%) scale(2); }
+  15%  { opacity: 1; transform: translate(-50%, -55%) scale(1); }
+  70%  { opacity: 0.8; }
+  100% { opacity: 0; transform: translate(-50%, -80%); }
+}
+
+/* ── MAGUS AREA ── */
+#magus-area {
+  height: 180px;
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  overflow: hidden;
+}
+#magus-img {
+  height: 170px;
+  image-rendering: auto;
+  transition: transform 0.2s;
+  z-index: 2;
+  object-fit: contain;
+}
+#magus-img.mixing { animation: magusMix 0.3s ease-in-out; }
+#magus-img.cackling { animation: magusCackle 0.5s ease-in-out; }
+#magus-img.disappointed { animation: magusSlump 0.6s ease-in-out; }
+
+@keyframes magusMix {
+  0%, 100% { transform: rotate(0deg); }
+  25% { transform: rotate(-8deg) translateY(-3px); }
+  75% { transform: rotate(8deg) translateY(-3px); }
+}
+@keyframes magusCackle {
+  0%, 100% { transform: scale(1) rotate(0deg); }
+  15% { transform: scale(1.15) rotate(-5deg); }
+  35% { transform: scale(1.2) rotate(5deg); }
+  55% { transform: scale(1.15) rotate(-3deg); }
+  75% { transform: scale(1.1) rotate(3deg); }
+}
+@keyframes magusSlump {
+  0% { transform: scale(1); }
+  40% { transform: scale(0.85) translateY(15px); }
+  100% { transform: scale(0.9) translateY(8px); }
+}
+
+/* ── GAME PLAY AREA ── */
+#play-area {
+  flex: 1;
+  position: relative;
+  overflow: hidden;
+  min-height: 200px;
+}
+
+/* ── FALLING ELEMENTS ── */
+.falling-element {
+  position: absolute;
+  width: 72px;
+  height: 38px;
+  border-radius: 19px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: 'MedievalSharp', cursive;
+  font-size: 0.65rem;
+  font-weight: bold;
+  color: #fff;
+  text-shadow: 0 1px 3px rgba(0,0,0,0.9);
+  cursor: pointer;
+  z-index: 5;
+  box-shadow: 0 3px 10px rgba(0,0,0,0.6), inset 0 2px 4px rgba(255,255,255,0.25), inset 0 -2px 4px rgba(0,0,0,0.2);
+  user-select: none;
+  -webkit-user-select: none;
+  border: 2px solid rgba(255,255,255,0.35);
+  text-align: center;
+  line-height: 1.1;
+  padding: 2px 6px;
+  overflow: hidden;
+  transition: transform 0.08s;
+}
+.falling-element::after {
+  content: '';
+  position: absolute;
+  top: 3px;
+  left: 15%;
+  width: 70%;
+  height: 40%;
+  background: linear-gradient(180deg, rgba(255,255,255,0.3), transparent);
+  border-radius: 50%;
+}
+.falling-element:hover { transform: scale(1.15); z-index: 6; }
+.falling-element:active { transform: scale(0.9); }
+.falling-element.caught {
+  animation: catchPop 0.35s ease-out forwards;
+  pointer-events: none;
+}
+@keyframes catchPop {
+  0%   { transform: scale(1); opacity: 1; }
+  40%  { transform: scale(1.6) rotate(15deg); opacity: 0.6; }
+  100% { transform: scale(0) rotate(45deg); opacity: 0; }
+}
+
+/* ── MIXING BOWL ── */
+#mixing-bowl {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 56px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  background: linear-gradient(0deg, rgba(0,0,0,0.6) 0%, rgba(0,0,0,0.2) 70%, transparent 100%);
+  z-index: 8;
+  padding: 0 6px;
+}
+.bowl-slot {
+  width: 48px;
+  height: 30px;
+  border-radius: 15px;
+  border: 2px dashed rgba(201,168,76,0.4);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.5rem;
+  font-weight: bold;
+  color: transparent;
+  transition: all 0.3s;
+}
+.bowl-slot.filled {
+  border-style: solid;
+  border-color: rgba(255,255,255,0.4);
+  box-shadow: 0 2px 8px rgba(0,0,0,0.4), inset 0 1px 3px rgba(255,255,255,0.2);
+  color: #fff;
+  text-shadow: 0 1px 2px rgba(0,0,0,0.8);
+}
+#bowl-controls {
+  display: flex;
+  gap: 4px;
+  margin-left: 6px;
+}
+#mix-btn {
+  padding: 8px 18px;
+  background: linear-gradient(135deg, #aa2200, #660000);
+  border: 2px solid var(--gold);
+  border-radius: 8px;
+  color: var(--gold);
+  font-family: 'UnifrakturMaguntia', cursive;
+  font-size: 1rem;
+  cursor: pointer;
+  transition: all 0.2s;
+  text-shadow: 0 0 8px rgba(201,168,76,0.3);
+}
+#mix-btn:hover:not(:disabled) {
+  box-shadow: 0 0 20px rgba(170,34,0,0.6);
+  transform: scale(1.1);
+  background: linear-gradient(135deg, #cc3300, #880000);
+}
+#mix-btn:disabled { opacity: 0.25; cursor: not-allowed; transform: none; }
+#mix-btn.ready {
+  animation: mixPulse 1s ease-in-out infinite;
+}
+@keyframes mixPulse {
+  0%, 100% { box-shadow: 0 0 5px rgba(170,34,0,0.3); }
+  50% { box-shadow: 0 0 20px rgba(255,100,0,0.6), 0 0 40px rgba(255,50,0,0.2); }
+}
+#clear-btn {
+  padding: 6px 10px;
+  background: transparent;
+  border: 1px solid rgba(201,168,76,0.4);
+  border-radius: 4px;
+  color: var(--gold);
+  font-family: 'MedievalSharp', cursive;
+  font-size: 0.7rem;
+  cursor: pointer;
+  opacity: 0.5;
+}
+
+/* ── PILBO AREA ── */
+#pilbo-area {
+  height: 210px;
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  background: linear-gradient(0deg, rgba(0,0,0,0.5), transparent);
+}
+#pilbo-container {
+  position: relative;
+  width: 180px;
+  height: 190px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+#pilbo-img {
+  height: 155px;
+  image-rendering: auto;
+  transition: filter 0.3s, transform 0.3s;
+  z-index: 2;
+  position: relative;
+  object-fit: contain;
+}
+
+/* Pilbo states */
+#pilbo-img.sweating { animation: pilboShake 0.25s ease-in-out infinite; }
+#pilbo-img.on-fire { animation: pilboFire 0.15s ease-in-out infinite; filter: brightness(1.4) saturate(1.8); }
+#pilbo-img.frozen { filter: brightness(1.4) saturate(0.2) hue-rotate(200deg) drop-shadow(0 0 10px #88ccff); animation: pilboShiver 0.08s linear infinite; }
+#pilbo-img.poof { animation: pilboPoof 0.5s ease-out forwards; }
+#pilbo-img.respawn { animation: pilboRespawn 0.8s ease-out; }
+#pilbo-img.cured { animation: pilboCured 1.2s ease-out; filter: drop-shadow(0 0 25px gold) drop-shadow(0 0 50px rgba(255,215,0,0.5)); }
+#pilbo-img.transform { animation: pilboTransform 0.5s ease-out; }
+
+@keyframes pilboShake {
+  0%, 100% { transform: translateX(0); }
+  25% { transform: translateX(-4px) rotate(-3deg); }
+  75% { transform: translateX(4px) rotate(3deg); }
+}
+@keyframes pilboFire {
+  0%, 100% { transform: translateY(0) scale(1); }
+  50% { transform: translateY(-4px) scale(1.06); }
+}
+@keyframes pilboShiver {
+  0%, 100% { transform: translateX(0); }
+  50% { transform: translateX(2px); }
+}
+@keyframes pilboPoof {
+  0%   { transform: scale(1); opacity: 1; filter: none; }
+  50%  { transform: scale(1.8) rotate(180deg); opacity: 0.4; filter: blur(8px); }
+  100% { transform: scale(0) rotate(360deg); opacity: 0; filter: blur(20px); }
+}
+@keyframes pilboRespawn {
+  0%   { transform: scale(0) rotate(-360deg); opacity: 0; }
+  50%  { transform: scale(1.3); opacity: 1; }
+  70%  { transform: scale(0.9); }
+  100% { transform: scale(1) rotate(0deg); }
+}
+@keyframes pilboCured {
+  0%   { transform: scale(1); }
+  20%  { transform: scale(1.3) translateY(-25px); }
+  40%  { transform: scale(1.1) translateY(-15px); }
+  60%  { transform: scale(1.2) translateY(-20px); }
+  80%  { transform: scale(1.05) translateY(-5px); }
+  100% { transform: scale(1) translateY(0); }
+}
+@keyframes pilboTransform {
+  0%   { transform: scale(1) rotate(0deg); }
+  30%  { transform: scale(0.3) rotate(180deg); filter: blur(5px); }
+  60%  { transform: scale(1.3) rotate(360deg); }
+  100% { transform: scale(1) rotate(360deg); filter: none; }
+}
+
+/* ── PARTICLES ── */
+.particle {
+  position: absolute;
+  pointer-events: none;
+  z-index: 15;
+}
+.flame-particle {
+  width: 16px; height: 22px;
+  background: radial-gradient(ellipse, #ff0 0%, #f80 40%, #f00 80%, transparent 100%);
+  border-radius: 50% 50% 50% 50% / 60% 60% 40% 40%;
+  animation: flameRise 0.5s ease-out forwards;
+}
+@keyframes flameRise {
+  0%   { transform: translateY(0) scale(1) rotate(0deg); opacity: 1; }
+  100% { transform: translateY(-90px) scale(0.15) rotate(var(--rot, 20deg)); opacity: 0; }
+}
+.sweat-particle {
+  width: 8px; height: 13px;
+  background: radial-gradient(ellipse, #8cf 0%, #48f 100%);
+  border-radius: 50% 50% 50% 50% / 30% 30% 70% 70%;
+  animation: sweatDrip 0.7s ease-in forwards;
+}
+@keyframes sweatDrip {
+  0%   { transform: translateY(0) scale(1); opacity: 1; }
+  100% { transform: translateY(50px) scale(0.4); opacity: 0; }
+}
+.ice-particle {
+  width: 12px; height: 12px;
+  background: radial-gradient(circle, #fff 0%, #aef 50%, transparent 100%);
+  clip-path: polygon(50% 0%, 61% 35%, 98% 35%, 68% 57%, 79% 91%, 50% 70%, 21% 91%, 32% 57%, 2% 35%, 39% 35%);
+  animation: iceDrift 1.5s ease-out forwards;
+}
+@keyframes iceDrift {
+  0%   { transform: translate(0, 0) rotate(0deg) scale(1); opacity: 1; }
+  100% { transform: translate(var(--dx, 20px), var(--dy, -30px)) rotate(180deg) scale(0); opacity: 0; }
+}
+.sparkle-particle {
+  width: 10px; height: 10px;
+  background: var(--gold-bright);
+  border-radius: 50%;
+  animation: sparkle 1s ease-out forwards;
+  box-shadow: 0 0 8px var(--gold-bright), 0 0 16px rgba(255,215,0,0.3);
+}
+@keyframes sparkle {
+  0%   { transform: translate(0,0) scale(1); opacity: 1; }
+  100% { transform: translate(var(--dx, 0), var(--dy, 0)) scale(0); opacity: 0; }
+}
+.poof-particle {
+  width: 24px; height: 24px;
+  background: radial-gradient(circle, rgba(255,255,255,0.8) 0%, rgba(180,180,180,0.4) 50%, transparent 100%);
+  border-radius: 50%;
+  animation: poofExpand 0.5s ease-out forwards;
+}
+@keyframes poofExpand {
+  0%   { transform: translate(0,0) scale(0.3); opacity: 0.9; }
+  100% { transform: translate(var(--dx,0), var(--dy,0)) scale(2.5); opacity: 0; }
+}
+
+/* ── PILBO STATUS LABEL ── */
+#pilbo-status {
+  position: absolute;
+  bottom: 2px;
+  left: 50%;
+  transform: translateX(-50%);
+  font-family: 'MedievalSharp', cursive;
+  font-size: 0.8rem;
+  color: var(--gold);
+  text-shadow: 0 0 10px rgba(0,0,0,0.9), 0 0 3px rgba(0,0,0,1);
+  white-space: nowrap;
+  z-index: 20;
+}
+
+/* ── BACKGROUND ── */
+#bg-canvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 0;
+  pointer-events: none;
+}
+
+/* ── TITLE SCREEN ── */
+#title-screen {
+  position: absolute;
+  inset: 0;
+  background: rgba(10,5,0,0.93);
+  z-index: 100;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+}
+#title-screen.hidden { display: none; }
+#title-screen h1 {
+  font-family: 'UnifrakturMaguntia', cursive;
+  font-size: 3.8rem;
+  color: var(--gold);
+  text-shadow: 0 0 30px rgba(201,168,76,0.6), 0 4px 8px rgba(0,0,0,0.5);
+  margin-bottom: 0.5rem;
+}
+#title-screen .tagline {
+  font-size: 1rem;
+  color: var(--bone);
+  opacity: 0.7;
+  margin-bottom: 0.5rem;
+  text-align: center;
+  padding: 0 1.5rem;
+  line-height: 1.5;
+}
+#title-screen .instructions {
+  font-size: 0.8rem;
+  color: var(--bone);
+  opacity: 0.45;
+  margin-bottom: 2rem;
+  text-align: center;
+  padding: 0 2rem;
+  line-height: 1.6;
+}
+#start-btn {
+  padding: 14px 48px;
+  font-size: 1.4rem;
+  animation: startPulse 2s ease-in-out infinite;
+}
+@keyframes startPulse {
+  0%, 100% { box-shadow: 0 0 10px rgba(201,168,76,0.3); }
+  50% { box-shadow: 0 0 30px rgba(201,168,76,0.6), 0 0 60px rgba(201,168,76,0.2); }
+}
+
+/* ── RESPONSIVE ── */
+@media (max-height: 700px) {
+  #magus-area { height: 130px; }
+  #magus-img { height: 120px; }
+  #pilbo-area { height: 160px; }
+  #pilbo-img { height: 125px; }
+  .falling-element { width: 62px; height: 34px; font-size: 0.55rem; }
+}
+@media (max-height: 600px) {
+  #magus-area { height: 100px; }
+  #magus-img { height: 90px; }
+  #pilbo-area { height: 130px; }
+}
+</style>
+</head>
+<body>
+
+<!-- SETUP SCREEN (API Key) -->
+<div id="setup-screen">
+  <h1>Pilbo</h1>
+  <p class="subtitle">The Alchemical Misadventures of a Homunculus</p>
+  <label for="api-key-input">Gemini API Key</label>
+  <input type="password" id="api-key-input" placeholder="AIza..." autocomplete="off">
+  <p class="note">Enter your Google Gemini API key to generate unique game artwork via AI. Get a free key at ai.google.dev</p>
+  <button class="btn" id="generate-btn" onclick="startImageGeneration()">Generate Artwork</button>
+  <div id="generate-status"></div>
+  <button class="btn" id="skip-btn" onclick="skipGeneration()">Skip &mdash; Use Fallback Art</button>
+</div>
+
+<!-- LOADING SCREEN -->
+<div id="loading-screen">
+  <h2>The Magus Prepares...</h2>
+  <div class="loading-bar"><div class="loading-fill" id="loading-fill"></div></div>
+  <div id="loading-text">Summoning ingredients...</div>
+</div>
+
+<!-- GAME CONTAINER -->
+<div id="game-container" class="hidden">
+  <canvas id="bg-canvas"></canvas>
+
+  <!-- HUD -->
+  <div id="hud">
+    <div>
+      <div id="score-display">0</div>
+      <div id="combo-display"></div>
+    </div>
+    <div id="level-display">Level I</div>
+  </div>
+
+  <!-- DISEASE TOAST -->
+  <div id="disease-toast"></div>
+  <div id="effect-label"></div>
+
+  <!-- MAGUS -->
+  <div id="magus-area">
+    <img id="magus-img" src="" alt="Magus Aurelius">
+  </div>
+
+  <!-- PLAY AREA -->
+  <div id="play-area">
+    <div id="mixing-bowl">
+      <div class="bowl-slot" id="slot0"></div>
+      <div class="bowl-slot" id="slot1"></div>
+      <div class="bowl-slot" id="slot2"></div>
+      <div class="bowl-slot" id="slot3"></div>
+      <div class="bowl-slot" id="slot4"></div>
+      <div id="bowl-controls">
+        <button id="mix-btn" disabled onclick="doMix()">Mix!</button>
+        <button id="clear-btn" onclick="doClear()">x</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- PILBO -->
+  <div id="pilbo-area">
+    <div id="pilbo-container">
+      <img id="pilbo-img" src="" alt="Pilbo">
+      <div id="pilbo-status"></div>
+    </div>
+  </div>
+
+  <!-- TITLE SCREEN OVERLAY -->
+  <div id="title-screen">
+    <h1>Pilbo</h1>
+    <p class="tagline">Catch ye alchemical elements!<br>Mix ye fantastical pills!<br>Feed the homunculus & cure preposterous ailments!</p>
+    <p class="instructions">Tap falling pills to catch them (up to 5).<br>Press MIX to feed them to Pilbo.<br>Neutralize effects to score points!</p>
+    <button class="btn" id="start-btn" onclick="startGame()">Begin Experiments</button>
+  </div>
+</div>
+
+<script>
+// ═══════════════════════════════════════════
+// SOUND FX (Web Audio API synthesized)
+// ═══════════════════════════════════════════
+
+let audioCtx;
+function initAudio() {
+  audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+}
+
+function playSound(type) {
+  if (!audioCtx) return;
+  const now = audioCtx.currentTime;
+  const osc = audioCtx.createOscillator();
+  const gain = audioCtx.createGain();
+  osc.connect(gain);
+  gain.connect(audioCtx.destination);
+
+  switch(type) {
+    case 'catch':
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(600, now);
+      osc.frequency.exponentialRampToValueAtTime(900, now + 0.1);
+      gain.gain.setValueAtTime(0.15, now);
+      gain.gain.exponentialRampToValueAtTime(0.001, now + 0.15);
+      osc.start(now); osc.stop(now + 0.15);
+      break;
+    case 'mix':
+      osc.type = 'sawtooth';
+      osc.frequency.setValueAtTime(150, now);
+      osc.frequency.exponentialRampToValueAtTime(400, now + 0.3);
+      gain.gain.setValueAtTime(0.1, now);
+      gain.gain.exponentialRampToValueAtTime(0.001, now + 0.4);
+      osc.start(now); osc.stop(now + 0.4);
+      break;
+    case 'cure':
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(440, now);
+      osc.frequency.setValueAtTime(554, now + 0.15);
+      osc.frequency.setValueAtTime(659, now + 0.3);
+      osc.frequency.setValueAtTime(880, now + 0.45);
+      gain.gain.setValueAtTime(0.2, now);
+      gain.gain.linearRampToValueAtTime(0.25, now + 0.3);
+      gain.gain.exponentialRampToValueAtTime(0.001, now + 0.8);
+      osc.start(now); osc.stop(now + 0.8);
+      break;
+    case 'fire':
+      osc.type = 'sawtooth';
+      osc.frequency.setValueAtTime(100, now);
+      osc.frequency.exponentialRampToValueAtTime(50, now + 0.5);
+      gain.gain.setValueAtTime(0.12, now);
+      gain.gain.exponentialRampToValueAtTime(0.001, now + 0.5);
+      osc.start(now); osc.stop(now + 0.5);
+      const noise = audioCtx.createBufferSource();
+      const buf = audioCtx.createBuffer(1, audioCtx.sampleRate * 0.3, audioCtx.sampleRate);
+      const d = buf.getChannelData(0);
+      for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
+      noise.buffer = buf;
+      const ng = audioCtx.createGain();
+      ng.gain.setValueAtTime(0.08, now);
+      ng.gain.exponentialRampToValueAtTime(0.001, now + 0.3);
+      noise.connect(ng); ng.connect(audioCtx.destination);
+      noise.start(now); noise.stop(now + 0.3);
+      break;
+    case 'transform':
+      osc.type = 'square';
+      osc.frequency.setValueAtTime(800, now);
+      osc.frequency.exponentialRampToValueAtTime(200, now + 0.2);
+      osc.frequency.exponentialRampToValueAtTime(600, now + 0.3);
+      gain.gain.setValueAtTime(0.08, now);
+      gain.gain.exponentialRampToValueAtTime(0.001, now + 0.35);
+      osc.start(now); osc.stop(now + 0.35);
+      break;
+    case 'freeze':
+      osc.type = 'triangle';
+      osc.frequency.setValueAtTime(2000, now);
+      osc.frequency.exponentialRampToValueAtTime(500, now + 0.4);
+      gain.gain.setValueAtTime(0.08, now);
+      gain.gain.exponentialRampToValueAtTime(0.001, now + 0.5);
+      osc.start(now); osc.stop(now + 0.5);
+      break;
+    case 'poof':
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(300, now);
+      osc.frequency.exponentialRampToValueAtTime(80, now + 0.3);
+      gain.gain.setValueAtTime(0.1, now);
+      gain.gain.exponentialRampToValueAtTime(0.001, now + 0.3);
+      osc.start(now); osc.stop(now + 0.3);
+      break;
+  }
+}
+
+// ═══════════════════════════════════════════
+// GAME DATA
+// ═══════════════════════════════════════════
+
+const ELEMENTS = [
+  { id:0,  name:"Cosmic Gigglium",     abbr:"CoGi", color:"#e85dba" },
+  { id:1,  name:"Mellow-Yellowite",    abbr:"MeYe", color:"#d4c040" },
+  { id:2,  name:"Groove-Tungsten",     abbr:"GrTu", color:"#7a5fcc" },
+  { id:3,  name:"Aura-Fluff",          abbr:"AuFl", color:"#c488ff" },
+  { id:4,  name:"Chakra-Bloop",        abbr:"ChBl", color:"#44bbdd" },
+  { id:5,  name:"Psychedelic-Sludge",  abbr:"PsSl", color:"#33ee66" },
+  { id:6,  name:"Zen-Jelly",           abbr:"ZeJe", color:"#55ddaa" },
+  { id:7,  name:"Vibe-Crystal",        abbr:"ViCr", color:"#6699ff" },
+  { id:8,  name:"Astral-Nougat",       abbr:"AsNo", color:"#cc7733" },
+  { id:9,  name:"Moon-Cheese",         abbr:"MoCh", color:"#eeee77" },
+  { id:10, name:"Karma-Resin",         abbr:"KaRe", color:"#cc4444" },
+  { id:11, name:"Far-Out-Foam",        abbr:"FaFo", color:"#88ddff" },
+  { id:12, name:"Harmonic-Fuzz",       abbr:"HaFu", color:"#dd77aa" },
+  { id:13, name:"Righteous-Rubble",    abbr:"RiRu", color:"#99aa55" },
+  { id:14, name:"Bongo-Dust",          abbr:"BoDu", color:"#ddaa44" },
+  { id:15, name:"Lava-Lamp-Liquid",    abbr:"LaLa", color:"#ff5533" }
+];
+
+const ELEMENT_EFFECTS = {
+  0:  { self:[[75,"sweating"],[25,"fire"]], trio:[[25,"turnip"],[75,"neutralize"]], quint:[[75,"frozen"],[25,"sweating"]] },
+  1:  { self:[[66,"pixelSort"],[34,"sweating"]], trio:[[10,"chicken"],[90,"fire"]], quint:[[25,"sweating"],[75,"neutralize"]] },
+  2:  { self:[[66,"pixelSort"],[34,"fire"]], trio:[[50,"neutralize"],[50,"pixelSort"]], quint:[[66,"neutralize"],[34,"colorFilter"]] },
+  3:  { self:[[90,"turnip"],[10,"fire"]], trio:[[33,"frozen"],[67,"chicken"]], quint:[[25,"turnip"],[75,"frozen"]] },
+  4:  { self:[[10,"newt"],[90,"sweating"]], trio:[[33,"chicken"],[67,"sweating"]], quint:[[90,"newt"],[10,"turnip"]] },
+  5:  { self:[[66,"fire"],[34,"colorFilter"]], trio:[[10,"sweating"],[90,"chicken"]], quint:[[90,"pixelSort"],[10,"turnip"]] },
+  6:  { self:[[66,"rgbCycle"],[34,"newt"]], trio:[[10,"neutralize"],[90,"sweating"]], quint:[[10,"neutralize"],[90,"turnip"]] },
+  7:  { self:[[50,"neutralize"],[50,"sweating"]], trio:[[75,"turnip"],[25,"colorFilter"]], quint:[[33,"newt"],[67,"frozen"]] },
+  8:  { self:[[75,"newt"],[25,"neutralize"]], trio:[[66,"turnip"],[34,"sweating"]], quint:[[75,"frozen"],[25,"pixelSort"]] },
+  9:  { self:[[50,"neutralize"],[50,"frozen"]], trio:[[75,"chicken"],[25,"turnip"]], quint:[[75,"pixelSort"],[25,"neutralize"]] },
+  10: { self:[[25,"newt"],[75,"fire"]], trio:[[50,"fire"],[50,"newt"]], quint:[[25,"turnip"],[75,"sweating"]] },
+  11: { self:[[25,"rgbCycle"],[75,"newt"]], trio:[[75,"colorFilter"],[25,"chicken"]], quint:[[33,"colorFilter"],[67,"frozen"]] },
+  12: { self:[[75,"frozen"],[25,"neutralize"]], trio:[[33,"pixelSort"],[67,"rgbCycle"]], quint:[[66,"rgbCycle"],[34,"chicken"]] },
+  13: { self:[[25,"chicken"],[75,"newt"]], trio:[[50,"frozen"],[50,"pixelSort"]], quint:[[90,"sweating"],[10,"fire"]] },
+  14: { self:[[75,"sweating"],[25,"frozen"]], trio:[[66,"frozen"],[34,"chicken"]], quint:[[50,"sweating"],[50,"chicken"]] },
+  15: { self:[[66,"rgbCycle"],[34,"colorFilter"]], trio:[[90,"turnip"],[10,"pixelSort"]], quint:[[75,"fire"],[25,"sweating"]] }
+};
+
+const EFFECT_NAMES = {
+  sweating: "Perspiration Most Vigorous!",
+  fire: "COMBUSTION!",
+  turnip: "Transmogrified into a Turnip!",
+  chicken: "Bawk! Now a Chicken!",
+  newt: "Newt-ification!",
+  pixelSort: "Reality Asunder!",
+  rgbCycle: "Chromatic Madness!",
+  colorFilter: "The World Shifts Hue!",
+  frozen: "Frozen Solid!",
+  neutralize: "CURED!"
+};
+
+const DISEASES = [
+  "The Bloody Flux","St. Vitus' Dance","The King's Evil","Dropsy of ye Brain",
+  "Mortification of ye Bowels","The Sweating Sickness","Putrid Sore Throat",
+  "Inflammation of ye Fundament","The Griping of ye Guts","Worm Fit",
+  "Rising of ye Lights","Chin Cough","Planet-Struck","Barrel Fever",
+  "The Black Vomit","Canine Madness","Jail Fever","The French Disease",
+  "Milk Leg","Scrumpox","The Vapours","Falling Sickness",
+  "Ship Fever","The Ague","Softening of ye Brain","Flying Gout",
+  "Quinsy of ye Tonsils","The Horrors","Costiveness Most Foul",
+  "Catarrh of ye Fundament","Phthisis of ye Lung","Water on ye Brain",
+  "Gathering of ye Humours","Excess of ye Bile","Distemper of ye Spleen",
+  "Corruption of ye Blood","The Plague of Boils","Grocer's Itch",
+  "Painter's Colic","The Green Sickness","Housemaid's Knee",
+  "The Marthambles","Crudites of ye Stomach","The Merrims",
+  "Scrivener's Palsy","The Twisting of ye Guts","Poxy Disposition",
+  "Effluvia of ye Nethers","Spontaneous Humour Combustion",
+  "The Wobbling Knee","Ghastly Pallor of ye Spleen"
+];
+
+const ROMAN = ['I','II','III','IV','V','VI','VII','VIII','IX','X','XI','XII','XIII','XIV','XV'];
+
+// ═══════════════════════════════════════════
+// IMAGE GENERATION (Gemini API)
+// ═══════════════════════════════════════════
+
+const IMAGE_PROMPTS = {
+  yurt_bg: "Interior of a medieval alchemist's yurt workshop, bubbling cauldrons, shelves of colorful potion bottles, mystical sigils on fabric walls, dark moody lighting with candles, rich detail, fantasy illustration style, 9:16 aspect ratio",
+  magus_idle: "Medieval alchemist character, elderly wizard in dark purple robes and tall pointy hat with stars, long white beard, standing at a workbench stirring a cauldron, whimsical cartoon style, full body, transparent background",
+  magus_mixing: "Medieval alchemist wizard in purple robes and pointy hat, vigorously mixing potions with both hands, ingredients flying everywhere, energetic pose, whimsical cartoon, full body, transparent background",
+  magus_dropping: "Medieval alchemist wizard in purple robes and pointy hat, one arm raised high dropping a glowing pill downward, dramatic pose, whimsical cartoon, full body, transparent background",
+  magus_cackling: "Medieval alchemist wizard in purple robes and pointy hat, throwing head back laughing maniacally, arms spread wide, gleeful, whimsical cartoon, full body, transparent background",
+  magus_disappointed: "Medieval alchemist wizard in purple robes and pointy hat, slumped shoulders looking grumpy and disappointed, crossed arms, whimsical cartoon, full body, transparent background",
+  pilbo_normal: "Cute small round homunculus creature, big googly eyes, tiny arms and legs, pale green skin, standing on stone pedestal, curious happy expression, whimsical cartoon, transparent background",
+  pilbo_sweating: "Cute round homunculus creature, pale green skin, big worried eyes, huge exaggerated sweat drops flying off, distressed, on stone pedestal, whimsical cartoon, transparent background",
+  pilbo_fire: "Cute round homunculus creature, completely engulfed in comical orange and yellow flames, screaming mouth wide open, eyes popping, on stone pedestal, whimsical cartoon, transparent background",
+  pilbo_frozen: "Cute round homunculus creature encased in transparent blue ice block, shivering, icicles hanging, blue tint, on stone pedestal, whimsical cartoon, transparent background",
+  pilbo_turnip: "Large purple turnip with cute cartoon face, big googly eyes, tiny mouth, sitting on stone pedestal, small leaf sprout on top, whimsical cartoon, transparent background",
+  pilbo_chicken: "Comical chicken with exaggerated googly eyes and pale green tinted feathers, confused expression, on stone pedestal, whimsical cartoon, transparent background",
+  pilbo_newt: "Small orange spotted newt salamander with exaggerated googly eyes, looking alarmed, on stone pedestal, whimsical cartoon, transparent background",
+  pilbo_cured: "Cute round homunculus, pale green skin, jumping for joy arms raised, surrounded by golden sparkles and hearts, glowing, on stone pedestal, whimsical cartoon, transparent background"
+};
+
+const IMAGE_KEYS = Object.keys(IMAGE_PROMPTS);
+let generatedImages = {};
+let apiKey = '';
+
+async function generateImage(prompt, retries = 2) {
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-image:generateContent?key=${apiKey}`;
+  for (let attempt = 0; attempt <= retries; attempt++) {
+    try {
+      const resp = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contents: [{ parts: [{ text: prompt }], role: 'user' }],
+          generationConfig: { responseModalities: ['TEXT', 'IMAGE'] }
+        })
+      });
+      if (!resp.ok) {
+        if (attempt < retries) { await new Promise(r => setTimeout(r, 2000 * (attempt + 1))); continue; }
+        const err = await resp.text();
+        throw new Error(`API ${resp.status}`);
+      }
+      const data = await resp.json();
+      const imgPart = data.candidates?.[0]?.content?.parts?.find(p => p.inlineData);
+      if (imgPart) return `data:${imgPart.inlineData.mimeType};base64,${imgPart.inlineData.data}`;
+      if (attempt < retries) { await new Promise(r => setTimeout(r, 2000)); continue; }
+      throw new Error('No image data');
+    } catch(e) {
+      if (attempt >= retries) throw e;
+      await new Promise(r => setTimeout(r, 2000 * (attempt + 1)));
+    }
+  }
+}
+
+async function startImageGeneration() {
+  apiKey = document.getElementById('api-key-input').value.trim();
+  if (!apiKey) { document.getElementById('generate-status').textContent = 'Please enter an API key.'; return; }
+
+  document.getElementById('generate-btn').disabled = true;
+  document.getElementById('setup-screen').classList.add('hidden');
+  const loadScreen = document.getElementById('loading-screen');
+  loadScreen.classList.add('active');
+  const fill = document.getElementById('loading-fill');
+  const loadText = document.getElementById('loading-text');
+
+  for (let i = 0; i < IMAGE_KEYS.length; i++) {
+    const key = IMAGE_KEYS[i];
+    fill.style.width = Math.round((i / IMAGE_KEYS.length) * 100) + '%';
+    loadText.textContent = `Conjuring ${key.replace(/_/g,' ')}... (${i+1}/${IMAGE_KEYS.length})`;
+
+    try {
+      generatedImages[key] = await generateImage(IMAGE_PROMPTS[key]);
+    } catch(e) {
+      loadText.textContent = `Failed: ${key}. Using fallback.`;
+      generatedImages[key] = null;
+      await new Promise(r => setTimeout(r, 800));
+    }
+    if (i < IMAGE_KEYS.length - 1) await new Promise(r => setTimeout(r, 3000));
+  }
+
+  fill.style.width = '100%';
+  loadText.textContent = 'All artwork conjured!';
+  await new Promise(r => setTimeout(r, 500));
+  loadScreen.classList.remove('active');
+  initGame();
+}
+
+async function skipGeneration() {
+  document.getElementById('setup-screen').classList.add('hidden');
+  const loadScreen = document.getElementById('loading-screen');
+  loadScreen.classList.add('active');
+  const fill = document.getElementById('loading-fill');
+  const loadText = document.getElementById('loading-text');
+  loadText.textContent = 'Loading pre-generated artwork...';
+
+  let loaded = 0;
+  for (let i = 0; i < IMAGE_KEYS.length; i++) {
+    const key = IMAGE_KEYS[i];
+    fill.style.width = Math.round((i / IMAGE_KEYS.length) * 100) + '%';
+    try {
+      const resp = await fetch('images/' + key + '.png');
+      if (resp.ok) {
+        const blob = await resp.blob();
+        generatedImages[key] = URL.createObjectURL(blob);
+        loaded++;
+      }
+    } catch(e) {}
+  }
+
+  fill.style.width = '100%';
+  if (loaded > 0) loadText.textContent = `Loaded ${loaded} artworks!`;
+  else loadText.textContent = 'Using fallback art.';
+  await new Promise(r => setTimeout(r, 400));
+  loadScreen.classList.remove('active');
+  initGame();
+}
+
+// ═══════════════════════════════════════════
+// FALLBACK ART (Canvas-drawn)
+// ═══════════════════════════════════════════
+
+function drawFallbackImage(key) {
+  const c = document.createElement('canvas');
+  c.width = 256; c.height = 256;
+  const ctx = c.getContext('2d');
+
+  if (key === 'yurt_bg') {
+    c.width = 480; c.height = 860;
+    drawYurtBg(ctx, 480, 860);
+  } else if (key.startsWith('magus_')) {
+    drawMagus(ctx, key);
+  } else {
+    drawPilbo(ctx, key);
+  }
+  return c.toDataURL();
+}
+
+function drawYurtBg(ctx, w, h) {
+  const g = ctx.createLinearGradient(0, 0, 0, h);
+  g.addColorStop(0, '#1a0f08');
+  g.addColorStop(0.3, '#231510');
+  g.addColorStop(0.6, '#2a1a0a');
+  g.addColorStop(1, '#0f0800');
+  ctx.fillStyle = g;
+  ctx.fillRect(0, 0, w, h);
+
+  ctx.strokeStyle = '#3a2a1a';
+  ctx.lineWidth = 1.5;
+  for (let i = 0; i < 14; i++) {
+    const x = (w / 14) * i + w/28;
+    ctx.beginPath();
+    ctx.moveTo(x, 0);
+    ctx.quadraticCurveTo(w/2, h * 0.25, x + (w/2 - x) * 0.1, h);
+    ctx.stroke();
+  }
+
+  for (let i = 0; i < 30; i++) {
+    ctx.fillStyle = `rgba(201,168,76,${Math.random() * 0.08 + 0.02})`;
+    ctx.beginPath();
+    ctx.arc(Math.random()*w, Math.random()*h, Math.random()*2.5 + 0.5, 0, Math.PI*2);
+    ctx.fill();
+  }
+
+  ctx.fillStyle = '#3d2a18';
+  ctx.fillRect(w*0.05, h*0.55, w*0.12, h*0.35);
+  ctx.fillRect(w*0.82, h*0.5, w*0.14, h*0.4);
+
+  const colors = ['#44aa44','#aa4444','#4444aa','#aaaa44','#aa44aa','#44aaaa','#ff8844','#8844ff','#44ff88'];
+  for (let i = 0; i < 9; i++) {
+    const bx = w*0.84 + (i%3) * 18;
+    const by = h*0.52 + Math.floor(i/3) * 28;
+    ctx.fillStyle = colors[i];
+    ctx.fillRect(bx, by, 14, 22);
+    ctx.fillStyle = 'rgba(255,255,255,0.15)';
+    ctx.fillRect(bx+2, by+2, 5, 7);
+  }
+}
+
+function drawMagus(ctx, key) {
+  ctx.clearRect(0, 0, 256, 256);
+  const bodyTilt = key === 'magus_mixing' ? -5 : key === 'magus_cackling' ? 5 : key === 'magus_disappointed' ? -3 : 0;
+  ctx.save();
+  ctx.translate(128, 128);
+  ctx.rotate(bodyTilt * Math.PI / 180);
+  ctx.translate(-128, -128);
+
+  // Robe
+  ctx.fillStyle = '#2a1055';
+  ctx.beginPath();
+  ctx.moveTo(100, 105);
+  ctx.lineTo(65, 242);
+  ctx.lineTo(191, 242);
+  ctx.lineTo(156, 105);
+  ctx.closePath();
+  ctx.fill();
+  ctx.fillStyle = '#1a0835';
+  ctx.fillRect(82, 242, 32, 14);
+  ctx.fillRect(142, 242, 32, 14);
+
+  // Head
+  ctx.fillStyle = '#f5deb3';
+  ctx.beginPath();
+  ctx.arc(128, 88, 26, 0, Math.PI * 2);
+  ctx.fill();
+
+  // Beard
+  ctx.fillStyle = '#ddd';
+  for (let i = -1; i <= 1; i += 2) {
+    ctx.beginPath();
+    ctx.moveTo(128 + i*12, 102);
+    ctx.quadraticCurveTo(128 + i*18, 145, 128 + i*14, 168);
+    ctx.lineTo(128 + i*8, 168);
+    ctx.quadraticCurveTo(128 + i*12, 145, 128 + i*7, 108);
+    ctx.fill();
+  }
+
+  // Hat
+  ctx.fillStyle = '#1a0835';
+  ctx.beginPath();
+  ctx.moveTo(90, 90);
+  ctx.lineTo(128, 15);
+  ctx.lineTo(166, 90);
+  ctx.closePath();
+  ctx.fill();
+  ctx.fillStyle = '#c9a84c';
+  ctx.font = '14px serif';
+  ctx.fillText('★', 120, 50);
+  ctx.fillText('☆', 132, 72);
+
+  // Face
+  ctx.fillStyle = '#222';
+  if (key === 'magus_cackling') {
+    ctx.beginPath(); ctx.arc(118, 84, 4, 0, Math.PI*2); ctx.fill();
+    ctx.beginPath(); ctx.arc(138, 84, 4, 0, Math.PI*2); ctx.fill();
+    ctx.beginPath(); ctx.arc(128, 97, 9, 0, Math.PI); ctx.fill();
+  } else if (key === 'magus_disappointed') {
+    ctx.beginPath(); ctx.arc(118, 85, 3, 0, Math.PI*2); ctx.fill();
+    ctx.beginPath(); ctx.arc(138, 85, 3, 0, Math.PI*2); ctx.fill();
+    ctx.strokeStyle = '#333'; ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.arc(128, 102, 6, Math.PI, 0); ctx.stroke();
+  } else {
+    ctx.beginPath(); ctx.arc(118, 84, 3, 0, Math.PI*2); ctx.fill();
+    ctx.beginPath(); ctx.arc(138, 84, 3, 0, Math.PI*2); ctx.fill();
+    ctx.fillRect(120, 97, 16, 2);
+  }
+
+  // Arms
+  const armAngles = {
+    magus_dropping: [-65, 15],
+    magus_mixing: [-35, 35],
+    magus_cackling: [-50, 50],
+    magus_disappointed: [-8, 8],
+    magus_idle: [-15, 15]
+  }[key] || [-15, 15];
+
+  ctx.strokeStyle = '#2a1055';
+  ctx.lineWidth = 10;
+  ctx.lineCap = 'round';
+
+  ctx.save();
+  ctx.translate(95, 122);
+  ctx.rotate(armAngles[0] * Math.PI / 180);
+  ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(-40, 8); ctx.stroke();
+  ctx.fillStyle = '#f5deb3';
+  ctx.beginPath(); ctx.arc(-42, 10, 7, 0, Math.PI*2); ctx.fill();
+  ctx.restore();
+
+  ctx.save();
+  ctx.translate(161, 122);
+  ctx.rotate(armAngles[1] * Math.PI / 180);
+  ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(40, 8); ctx.stroke();
+  ctx.fillStyle = '#f5deb3';
+  ctx.beginPath(); ctx.arc(42, 10, 7, 0, Math.PI*2); ctx.fill();
+  ctx.restore();
+
+  ctx.restore();
+
+  if (key === 'magus_dropping') {
+    ctx.fillStyle = '#ff66aa';
+    ctx.beginPath();
+    ctx.ellipse(62, 48, 10, 7, 0, 0, Math.PI*2);
+    ctx.fill();
+    ctx.fillStyle = 'rgba(255,255,255,0.3)';
+    ctx.beginPath();
+    ctx.ellipse(60, 45, 4, 2.5, -0.3, 0, Math.PI*2);
+    ctx.fill();
+  }
+}
+
+function drawPilbo(ctx, key) {
+  ctx.clearRect(0, 0, 256, 256);
+
+  // Shadow
+  ctx.fillStyle = 'rgba(0,0,0,0.3)';
+  ctx.beginPath();
+  ctx.ellipse(128, 238, 35, 10, 0, 0, Math.PI * 2);
+  ctx.fill();
+
+  if (key === 'pilbo_turnip') {
+    drawTurnip(ctx); return;
+  }
+  if (key === 'pilbo_chicken') {
+    drawChicken(ctx); return;
+  }
+  if (key === 'pilbo_newt') {
+    drawNewt(ctx); return;
+  }
+
+  let bodyColor = '#8bbd8b';
+  if (key === 'pilbo_sweating') bodyColor = '#9dc09d';
+  if (key === 'pilbo_fire') bodyColor = '#cc9966';
+  if (key === 'pilbo_frozen') bodyColor = '#88aacc';
+  if (key === 'pilbo_cured') bodyColor = '#a8dda8';
+
+  // Body
+  ctx.fillStyle = bodyColor;
+  ctx.beginPath();
+  ctx.ellipse(128, 162, 42, 52, 0, 0, Math.PI*2);
+  ctx.fill();
+
+  // Legs
+  ctx.fillStyle = bodyColor;
+  ctx.fillRect(100, 208, 13, 26);
+  ctx.fillRect(143, 208, 13, 26);
+
+  // Arms
+  ctx.strokeStyle = bodyColor;
+  ctx.lineWidth = 9;
+  ctx.lineCap = 'round';
+  const armY = key === 'pilbo_cured' ? -20 : 5;
+  ctx.beginPath(); ctx.moveTo(86, 158); ctx.lineTo(62, 158 + armY); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(170, 158); ctx.lineTo(194, 158 + armY); ctx.stroke();
+
+  // Eyes
+  drawGooglyEyes(ctx, 113, 143, 128, 12);
+  drawGooglyEyes(ctx, 143, 143, 128, 12);
+
+  // Mouth
+  drawMouth(ctx, 128, 172, key);
+
+  // State overlays
+  if (key === 'pilbo_sweating') {
+    ctx.fillStyle = '#5599ff';
+    for (let i = 0; i < 8; i++) {
+      const sx = 95 + Math.random() * 66;
+      const sy = 115 + Math.random() * 70;
+      ctx.beginPath();
+      ctx.ellipse(sx, sy, 3, 5, Math.random() * 0.5, 0, Math.PI*2);
+      ctx.fill();
+    }
+  }
+  if (key === 'pilbo_fire') {
+    for (let i = 0; i < 10; i++) {
+      const fx = 92 + Math.random() * 72;
+      const fy = 115 + Math.random() * 65;
+      const fs = 10 + Math.random() * 18;
+      ctx.fillStyle = Math.random() > 0.4 ? '#ff4400' : '#ffaa00';
+      ctx.beginPath();
+      ctx.moveTo(fx, fy);
+      ctx.quadraticCurveTo(fx - fs/2, fy - fs, fx, fy - fs*1.5);
+      ctx.quadraticCurveTo(fx + fs/2, fy - fs, fx, fy);
+      ctx.fill();
+    }
+  }
+  if (key === 'pilbo_frozen') {
+    ctx.strokeStyle = 'rgba(180,220,255,0.5)';
+    ctx.lineWidth = 3;
+    ctx.strokeRect(82, 106, 92, 135);
+    ctx.fillStyle = 'rgba(180,220,255,0.08)';
+    ctx.fillRect(82, 106, 92, 135);
+    for (let i = 0; i < 6; i++) {
+      ctx.fillStyle = 'rgba(180,220,255,0.7)';
+      const ix = 88 + Math.random() * 76;
+      ctx.beginPath();
+      ctx.moveTo(ix, 106); ctx.lineTo(ix-3, 92); ctx.lineTo(ix+3, 92);
+      ctx.fill();
+    }
+  }
+  if (key === 'pilbo_cured') {
+    ctx.fillStyle = '#ffd700';
+    for (let i = 0; i < 12; i++) {
+      ctx.beginPath();
+      ctx.arc(75 + Math.random()*106, 95 + Math.random()*120, 2 + Math.random()*4, 0, Math.PI*2);
+      ctx.fill();
+    }
+    ctx.fillStyle = '#ff6688';
+    ctx.font = '18px serif';
+    ctx.fillText('♥', 78, 118);
+    ctx.fillText('♥', 168, 128);
+    ctx.fillText('♥', 125, 92);
+  }
+}
+
+function drawTurnip(ctx) {
+  ctx.fillStyle = '#7b3a8b';
+  ctx.beginPath();
+  ctx.ellipse(128, 165, 42, 55, 0, 0, Math.PI*2);
+  ctx.fill();
+  ctx.fillStyle = '#5a2a6a';
+  ctx.beginPath();
+  ctx.moveTo(128, 228);
+  ctx.quadraticCurveTo(137, 252, 132, 256);
+  ctx.quadraticCurveTo(124, 256, 128, 228);
+  ctx.fill();
+  ctx.fillStyle = '#3a8a3a';
+  for (let i = -1; i <= 1; i++) {
+    ctx.beginPath();
+    ctx.moveTo(128, 110);
+    ctx.quadraticCurveTo(128 + i*25, 85, 128 + i*35, 75);
+    ctx.quadraticCurveTo(128 + i*20, 88, 128, 110);
+    ctx.fill();
+  }
+  drawGooglyEyes(ctx, 115, 155, 128, 10);
+  drawGooglyEyes(ctx, 141, 155, 128, 10);
+  drawMouth(ctx, 128, 178, 'pilbo_normal');
+}
+
+function drawChicken(ctx) {
+  ctx.fillStyle = '#e8d8b8';
+  ctx.beginPath();
+  ctx.ellipse(128, 170, 36, 42, 0, 0, Math.PI*2);
+  ctx.fill();
+  ctx.fillStyle = '#f0e0c0';
+  ctx.beginPath();
+  ctx.ellipse(128, 125, 24, 26, 0, 0, Math.PI*2);
+  ctx.fill();
+  ctx.fillStyle = '#cc3333';
+  ctx.beginPath();
+  ctx.moveTo(122, 100); ctx.lineTo(128, 82); ctx.lineTo(134, 100);
+  ctx.fill();
+  ctx.fillStyle = '#dd8800';
+  ctx.beginPath();
+  ctx.moveTo(128, 128); ctx.lineTo(148, 124); ctx.lineTo(128, 133);
+  ctx.fill();
+  drawGooglyEyes(ctx, 118, 120, 128, 8);
+  drawGooglyEyes(ctx, 138, 120, 128, 8);
+  ctx.fillStyle = '#dd8800';
+  ctx.fillRect(116, 216, 9, 22);
+  ctx.fillRect(131, 216, 9, 22);
+}
+
+function drawNewt(ctx) {
+  ctx.fillStyle = '#dd7722';
+  ctx.beginPath();
+  ctx.ellipse(120, 175, 32, 22, -0.1, 0, Math.PI*2);
+  ctx.fill();
+  ctx.beginPath();
+  ctx.ellipse(120, 152, 20, 18, 0, 0, Math.PI*2);
+  ctx.fill();
+  // Tail
+  ctx.beginPath();
+  ctx.moveTo(150, 178);
+  ctx.quadraticCurveTo(185, 182, 200, 165);
+  ctx.quadraticCurveTo(195, 178, 150, 173);
+  ctx.fill();
+  // Spots
+  ctx.fillStyle = '#aa5500';
+  for (let i = 0; i < 5; i++) {
+    ctx.beginPath();
+    ctx.arc(100 + Math.random()*40, 158 + Math.random()*25, 3 + Math.random()*3, 0, Math.PI*2);
+    ctx.fill();
+  }
+  // Legs
+  ctx.fillStyle = '#dd7722';
+  ctx.fillRect(100, 190, 7, 25);
+  ctx.fillRect(138, 190, 7, 25);
+  ctx.fillRect(107, 185, 7, 28);
+  ctx.fillRect(131, 185, 7, 28);
+  drawGooglyEyes(ctx, 112, 147, 120, 8);
+  drawGooglyEyes(ctx, 130, 147, 120, 8);
+}
+
+function drawGooglyEyes(ctx, x, y, cx, r) {
+  ctx.fillStyle = '#fff';
+  ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI*2); ctx.fill();
+  ctx.strokeStyle = '#333'; ctx.lineWidth = 1; ctx.stroke();
+  const angle = Math.atan2(5, x - cx);
+  ctx.fillStyle = '#111';
+  ctx.beginPath();
+  ctx.arc(x + Math.cos(angle) * r * 0.3, y + Math.sin(angle) * r * 0.25, r * 0.45, 0, Math.PI*2);
+  ctx.fill();
+}
+
+function drawMouth(ctx, x, y, key) {
+  ctx.strokeStyle = '#444';
+  ctx.lineWidth = 2;
+  ctx.fillStyle = '#444';
+  if (key === 'pilbo_fire' || key === 'pilbo_sweating') {
+    ctx.beginPath(); ctx.arc(x, y, 10, 0, Math.PI); ctx.fill();
+  } else if (key === 'pilbo_cured') {
+    ctx.beginPath(); ctx.arc(x, y - 2, 8, 0.1, Math.PI - 0.1); ctx.stroke();
+  } else if (key === 'pilbo_frozen') {
+    ctx.beginPath(); ctx.moveTo(x-7, y+2); ctx.lineTo(x+7, y+2); ctx.stroke();
+  } else {
+    ctx.beginPath(); ctx.arc(x, y, 6, 0.15, Math.PI - 0.15); ctx.stroke();
+  }
+}
+
+const fallbackCache = {};
+function getImage(key) {
+  if (generatedImages[key]) return generatedImages[key];
+  if (!fallbackCache[key]) fallbackCache[key] = drawFallbackImage(key);
+  return fallbackCache[key];
+}
+
+// ═══════════════════════════════════════════
+// GAME STATE
+// ═══════════════════════════════════════════
+
+const GS = {
+  score: 0,
+  level: 1,
+  fallSpeed: 1.0,
+  spawnInterval: 2400,
+  lastSpawnTime: 0,
+  fallingElements: [],
+  collectedElements: [],
+  currentEffect: null,
+  effectTimer: null,
+  pilboState: 'normal',
+  running: false,
+  diseaseIndex: 0,
+  cureCount: 0
+};
+
+const LEVEL_THRESHOLDS = [0, 100, 250, 500, 850, 1300, 1800, 2500, 3300, 4200, 5300, 6500, 8000, 10000, 12500];
+const POINTS = { self: 50, trio: 100, quint: 250 };
+
+// ═══════════════════════════════════════════
+// GAME INIT
+// ═══════════════════════════════════════════
+
+function initGame() {
+  const gc = document.getElementById('game-container');
+  gc.classList.remove('hidden');
+  document.getElementById('magus-img').src = getImage('magus_idle');
+  document.getElementById('pilbo-img').src = getImage('pilbo_normal');
+  drawBackground();
+  updateHUD();
+}
+
+function drawBackground() {
+  const canvas = document.getElementById('bg-canvas');
+  const gc = document.getElementById('game-container');
+  canvas.width = gc.offsetWidth;
+  canvas.height = gc.offsetHeight;
+  const ctx = canvas.getContext('2d');
+  if (generatedImages.yurt_bg) {
+    const img = new Image();
+    img.onload = () => {
+      ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+      ctx.fillStyle = 'rgba(0,0,0,0.25)';
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+    };
+    img.src = generatedImages.yurt_bg;
+  } else {
+    drawYurtBg(ctx, canvas.width, canvas.height);
+  }
+}
+
+function startGame() {
+  document.getElementById('title-screen').classList.add('hidden');
+  initAudio();
+  GS.running = true;
+  GS.lastSpawnTime = performance.now();
+  lastFrameTime = 0;
+  requestAnimationFrame(gameLoop);
+}
+
+// ═══════════════════════════════════════════
+// GAME LOOP
+// ═══════════════════════════════════════════
+
+let lastFrameTime = 0;
+
+function gameLoop(timestamp) {
+  if (!GS.running) return;
+  const dt = lastFrameTime ? (timestamp - lastFrameTime) : 16;
+  lastFrameTime = timestamp;
+
+  maybeSpawnElement(timestamp);
+  updateFallingElements(dt);
+
+  requestAnimationFrame(gameLoop);
+}
+
+function maybeSpawnElement(timestamp) {
+  if (timestamp - GS.lastSpawnTime >= GS.spawnInterval) {
+    spawnElement();
+    GS.lastSpawnTime = timestamp;
+  }
+}
+
+function spawnElement() {
+  const playArea = document.getElementById('play-area');
+  const areaWidth = playArea.offsetWidth;
+  const elemData = ELEMENTS[Math.floor(Math.random() * ELEMENTS.length)];
+
+  const el = document.createElement('div');
+  el.className = 'falling-element';
+  el.style.background = `linear-gradient(145deg, ${elemData.color}, ${adjustColor(elemData.color, -40)})`;
+  el.style.left = (Math.random() * (areaWidth - 80) + 4) + 'px';
+  el.style.top = '-42px';
+  el.textContent = elemData.abbr;
+  el.title = elemData.name;
+
+  const feObj = { el, data: elemData, y: -42, speed: GS.fallSpeed + Math.random() * 0.4, caught: false };
+
+  const handler = (e) => { e.preventDefault(); e.stopPropagation(); catchElement(feObj); };
+  el.addEventListener('pointerdown', handler);
+
+  playArea.appendChild(el);
+  GS.fallingElements.push(feObj);
+  triggerMagusAnim('magus_dropping');
+}
+
+function catchElement(feObj) {
+  if (feObj.caught || GS.collectedElements.length >= 5) return;
+  feObj.caught = true;
+  feObj.el.classList.add('caught');
+  GS.collectedElements.push(feObj.data);
+  updateBowl();
+  playSound('catch');
+  setTimeout(() => { if (feObj.el.parentNode) feObj.el.remove(); }, 350);
+}
+
+function updateFallingElements(dt) {
+  const playArea = document.getElementById('play-area');
+  const areaHeight = playArea.offsetHeight;
+
+  for (let i = GS.fallingElements.length - 1; i >= 0; i--) {
+    const fe = GS.fallingElements[i];
+    if (fe.caught) { GS.fallingElements.splice(i, 1); continue; }
+    fe.y += fe.speed * (dt / 16);
+    fe.el.style.top = fe.y + 'px';
+    if (fe.y > areaHeight + 10) {
+      fe.el.remove();
+      GS.fallingElements.splice(i, 1);
+    }
+  }
+}
+
+// ═══════════════════════════════════════════
+// MIXING
+// ═══════════════════════════════════════════
+
+function updateBowl() {
+  for (let i = 0; i < 5; i++) {
+    const slot = document.getElementById('slot' + i);
+    if (i < GS.collectedElements.length) {
+      const elem = GS.collectedElements[i];
+      slot.classList.add('filled');
+      slot.style.background = `linear-gradient(145deg, ${elem.color}, ${adjustColor(elem.color, -35)})`;
+      slot.textContent = elem.abbr;
+    } else {
+      slot.classList.remove('filled');
+      slot.style.background = '';
+      slot.textContent = '';
+    }
+  }
+  const mixBtn = document.getElementById('mix-btn');
+  const canMix = GS.collectedElements.length >= 2;
+  mixBtn.disabled = !canMix;
+  mixBtn.classList.toggle('ready', canMix);
+}
+
+function doMix() {
+  if (GS.collectedElements.length < 2) return;
+  playSound('mix');
+
+  const elements = [...GS.collectedElements];
+  GS.collectedElements = [];
+  updateBowl();
+
+  const uniqueIds = new Set(elements.map(e => e.id));
+  const count = elements.length;
+  const uniqueCount = uniqueIds.size;
+
+  let tier;
+  if (uniqueCount === 1) tier = 'self';
+  else if (count <= 3 || uniqueCount <= 3) tier = 'trio';
+  else tier = 'quint';
+
+  const dominantId = elements[Math.floor(Math.random() * elements.length)].id;
+  const effectTable = ELEMENT_EFFECTS[dominantId][tier];
+
+  let roll = Math.random() * 100, cumulative = 0, effect = effectTable[effectTable.length - 1][1];
+  for (const [pct, eff] of effectTable) {
+    cumulative += pct;
+    if (roll < cumulative) { effect = eff; break; }
+  }
+
+  applyEffect(effect, tier);
+  triggerMagusAnim(effect === 'neutralize' ? 'magus_disappointed' : 'magus_cackling');
+}
+
+function doClear() {
+  GS.collectedElements = [];
+  updateBowl();
+}
+
+// ═══════════════════════════════════════════
+// EFFECTS
+// ═══════════════════════════════════════════
+
+function applyEffect(effect, tier) {
+  clearCurrentEffect();
+
+  const gc = document.getElementById('game-container');
+  const pilboImg = document.getElementById('pilbo-img');
+  const statusEl = document.getElementById('pilbo-status');
+
+  GS.currentEffect = effect;
+  showEffectLabel(EFFECT_NAMES[effect] || effect);
+
+  let duration = 3500;
+
+  switch (effect) {
+    case 'sweating':
+      pilboImg.src = getImage('pilbo_sweating');
+      pilboImg.className = 'sweating';
+      statusEl.textContent = 'Perspiring profusely!';
+      spawnParticles('sweat', 10);
+      duration = 4500;
+      break;
+
+    case 'fire':
+      playSound('fire');
+      pilboImg.src = getImage('pilbo_fire');
+      pilboImg.className = 'on-fire';
+      statusEl.textContent = 'ON FIRE!!!';
+      spawnParticles('flame', 14);
+      duration = 3500;
+      GS.effectTimer = setTimeout(() => {
+        playSound('poof');
+        pilboImg.className = 'poof';
+        spawnParticles('poof', 10);
+        statusEl.textContent = '*poof*';
+        setTimeout(() => {
+          pilboImg.src = getImage('pilbo_normal');
+          pilboImg.className = 'respawn';
+          statusEl.textContent = 'Reborn!';
+          GS.pilboState = 'normal';
+          setTimeout(() => { pilboImg.className = ''; statusEl.textContent = ''; GS.currentEffect = null; }, 1500);
+        }, 600);
+      }, duration);
+      return;
+
+    case 'turnip':
+      playSound('transform');
+      pilboImg.src = getImage('pilbo_turnip');
+      pilboImg.className = 'transform';
+      statusEl.textContent = 'A turnip?!';
+      spawnParticles('poof', 8);
+      duration = 6000;
+      break;
+
+    case 'chicken':
+      playSound('transform');
+      pilboImg.src = getImage('pilbo_chicken');
+      pilboImg.className = 'transform';
+      statusEl.textContent = 'BAWK BAWK!';
+      spawnParticles('poof', 8);
+      duration = 6000;
+      break;
+
+    case 'newt':
+      playSound('transform');
+      pilboImg.src = getImage('pilbo_newt');
+      pilboImg.className = 'transform';
+      statusEl.textContent = "He got better... eventually";
+      spawnParticles('poof', 8);
+      duration = 7000;
+      break;
+
+    case 'pixelSort':
+      gc.classList.add('pixel-sort');
+      statusEl.textContent = 'Reality is melting!';
+      duration = 3000;
+      break;
+
+    case 'rgbCycle':
+      gc.classList.add('rgb-cycle');
+      statusEl.textContent = 'So many colours!';
+      duration = 4000;
+      break;
+
+    case 'colorFilter':
+      gc.classList.add('color-filter');
+      gc.style.setProperty('--hue-shift', (Math.random() * 280 + 40) + 'deg');
+      statusEl.textContent = 'Everything looks strange!';
+      duration = 4500;
+      break;
+
+    case 'frozen':
+      playSound('freeze');
+      pilboImg.src = getImage('pilbo_frozen');
+      pilboImg.className = 'frozen';
+      statusEl.textContent = 'Frozen solid!';
+      spawnParticles('ice', 12);
+      duration = 5000;
+      break;
+
+    case 'neutralize':
+      playSound('cure');
+      pilboImg.src = getImage('pilbo_cured');
+      pilboImg.className = 'cured';
+      spawnParticles('sparkle', 20);
+
+      const pts = POINTS[tier] || POINTS.self;
+      GS.score += pts;
+      GS.cureCount++;
+
+      const disease = DISEASES[GS.diseaseIndex % DISEASES.length];
+      GS.diseaseIndex++;
+
+      showDiseaseToast(disease, pts);
+      updateLevel();
+      updateHUD();
+
+      statusEl.textContent = `CURED! +${pts}`;
+      duration = 3500;
+      break;
+  }
+
+  GS.effectTimer = setTimeout(() => clearCurrentEffect(), duration);
+}
+
+function clearCurrentEffect() {
+  if (GS.effectTimer) { clearTimeout(GS.effectTimer); GS.effectTimer = null; }
+  const gc = document.getElementById('game-container');
+  gc.classList.remove('pixel-sort', 'rgb-cycle', 'color-filter');
+  gc.style.removeProperty('--hue-shift');
+  const pilboImg = document.getElementById('pilbo-img');
+  pilboImg.src = getImage('pilbo_normal');
+  pilboImg.className = '';
+  document.getElementById('pilbo-status').textContent = '';
+  GS.currentEffect = null;
+  GS.pilboState = 'normal';
+}
+
+function showEffectLabel(text) {
+  const el = document.getElementById('effect-label');
+  el.classList.remove('show');
+  void el.offsetWidth;
+  el.textContent = text;
+  el.classList.add('show');
+  setTimeout(() => el.classList.remove('show'), 2500);
+}
+
+// ═══════════════════════════════════════════
+// PARTICLES
+// ═══════════════════════════════════════════
+
+function spawnParticles(type, count) {
+  const container = document.getElementById('pilbo-container');
+
+  for (let i = 0; i < count; i++) {
+    const p = document.createElement('div');
+    p.className = `particle ${type}-particle`;
+    const ox = Math.random() * 130 - 65;
+    const oy = Math.random() * 100 - 50;
+    p.style.left = (90 + ox) + 'px';
+    p.style.top = (95 + oy) + 'px';
+
+    if (type === 'flame') {
+      p.style.setProperty('--rot', (Math.random() * 40 - 20) + 'deg');
+    }
+    if (type === 'ice' || type === 'sparkle' || type === 'poof') {
+      p.style.setProperty('--dx', (Math.random() * 100 - 50) + 'px');
+      p.style.setProperty('--dy', (Math.random() * 100 - 50) + 'px');
+    }
+    p.style.animationDelay = (Math.random() * 0.25) + 's';
+    container.appendChild(p);
+
+    const dur = { flame: 500, sweat: 700, ice: 1500, sparkle: 1000, poof: 500 }[type] || 600;
+    setTimeout(() => { if (p.parentNode) p.remove(); }, dur + 400);
+  }
+
+  if (type === 'flame' || type === 'sweat') {
+    let bursts = 0;
+    const iv = setInterval(() => {
+      if (++bursts > 5) { clearInterval(iv); return; }
+      for (let i = 0; i < Math.ceil(count / 4); i++) {
+        const p = document.createElement('div');
+        p.className = `particle ${type}-particle`;
+        p.style.left = (90 + Math.random() * 130 - 65) + 'px';
+        p.style.top = (95 + Math.random() * 100 - 50) + 'px';
+        if (type === 'flame') p.style.setProperty('--rot', (Math.random()*40-20) + 'deg');
+        container.appendChild(p);
+        const dur = type === 'flame' ? 500 : 700;
+        setTimeout(() => { if (p.parentNode) p.remove(); }, dur + 300);
+      }
+    }, type === 'flame' ? 350 : 500);
+    setTimeout(() => clearInterval(iv), 4000);
+  }
+}
+
+// ═══════════════════════════════════════════
+// MAGUS
+// ═══════════════════════════════════════════
+
+let magusTimer = null;
+
+function triggerMagusAnim(state) {
+  const img = document.getElementById('magus-img');
+  img.src = getImage(state);
+  const cls = { magus_mixing:'mixing', magus_cackling:'cackling', magus_disappointed:'disappointed' }[state] || 'mixing';
+  img.classList.remove('mixing', 'cackling', 'disappointed');
+  void img.offsetWidth;
+  img.classList.add(cls);
+  if (magusTimer) clearTimeout(magusTimer);
+  magusTimer = setTimeout(() => {
+    img.src = getImage('magus_idle');
+    img.classList.remove('mixing', 'cackling', 'disappointed');
+  }, 1500);
+}
+
+// ═══════════════════════════════════════════
+// HUD & SCORING
+// ═══════════════════════════════════════════
+
+function updateHUD() {
+  document.getElementById('score-display').textContent = GS.score.toLocaleString();
+  document.getElementById('level-display').textContent = 'Level ' + (ROMAN[GS.level - 1] || GS.level);
+  document.getElementById('combo-display').textContent = GS.cureCount > 0 ? `${GS.cureCount} disease${GS.cureCount !== 1 ? 's' : ''} cured` : '';
+}
+
+function updateLevel() {
+  for (let i = LEVEL_THRESHOLDS.length - 1; i >= 0; i--) {
+    if (GS.score >= LEVEL_THRESHOLDS[i]) {
+      GS.level = i + 1;
+      GS.fallSpeed = 1.0 + GS.level * 0.25;
+      GS.spawnInterval = Math.max(800, 2400 - GS.level * 110);
+      break;
+    }
+  }
+}
+
+function showDiseaseToast(disease, pts) {
+  const toast = document.getElementById('disease-toast');
+  toast.classList.remove('show');
+  void toast.offsetWidth;
+  toast.innerHTML = `CURED!<br><span style="font-size:1rem;font-family:MedievalSharp,cursive">"${disease}"</span><br><span style="font-size:0.95rem;color:#fff">+${pts} points</span>`;
+  toast.classList.add('show');
+  setTimeout(() => toast.classList.remove('show'), 4000);
+}
+
+// ═══════════════════════════════════════════
+// UTILITIES
+// ═══════════════════════════════════════════
+
+function adjustColor(hex, amount) {
+  hex = hex.replace('#', '');
+  const r = Math.max(0, Math.min(255, parseInt(hex.substr(0, 2), 16) + amount));
+  const g = Math.max(0, Math.min(255, parseInt(hex.substr(2, 2), 16) + amount));
+  const b = Math.max(0, Math.min(255, parseInt(hex.substr(4, 2), 16) + amount));
+  return `#${r.toString(16).padStart(2,'0')}${g.toString(16).padStart(2,'0')}${b.toString(16).padStart(2,'0')}`;
+}
+
+// Keyboard controls
+document.addEventListener('keydown', (e) => {
+  if (e.code === 'Space' || e.key === ' ') { e.preventDefault(); doMix(); }
+  if (e.code === 'KeyC') doClear();
+});
+</script>
+</body>
+</html>
